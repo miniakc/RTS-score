@@ -1,1 +1,309 @@
-# RTS-score
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>RTS( Revised Trauma Score ) 계산기 – GCS E+V+M 지원</title>
+  <style>
+    :root{ --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --ok:#10b981; --warn:#f59e0b; --crit:#ef4444; --shadow:0 10px 30px rgba(0,0,0,.35); --radius:18px; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0b1221 0%,#0f172a 100%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Apple SD Gothic Neo,Noto Sans KR,"맑은 고딕",sans-serif}
+    .wrap{max-width:720px;margin:0 auto;padding:clamp(16px,4vw,28px)}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title{font-size:clamp(18px,4.2vw,28px);font-weight:800;letter-spacing:.2px}
+    .subtitle{color:var(--muted);font-size:clamp(12px,2.6vw,14px)}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.07);backdrop-filter: blur(8px);border-radius:var(--radius);box-shadow:var(--shadow);padding:clamp(14px,3vw,20px);margin:14px 0}
+    .grid{display:grid;gap:12px;grid-template-columns:1fr}
+    @media(min-width:560px){.grid{grid-template-columns:1fr 1fr}}
+    label{display:block;font-weight:700;margin-bottom:6px}
+    .field{display:flex;gap:10px;align-items:center}
+    input[type=number]{flex:1;appearance:textfield;background:#0b1020;color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;font-size:16px}
+    input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{appearance:none;margin:0}
+    .hint{font-size:12px;color:var(--muted)}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.12);color:var(--muted)}
+    .result{display:grid;grid-template-columns:1fr;gap:8px}
+    .result-row{display:flex;align-items:center;justify-content:space-between;background:#0b1020;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:12px}
+    .result-row strong{font-size:16px}
+    .badge{border-radius:10px;padding:6px 10px;font-weight:700}
+    .ok{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.35)}
+    .warn{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
+    .crit{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.35)}
+    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .note{font-size:12px;color:var(--muted);line-height:1.5}
+    .footer{margin-top:18px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    button{background:var(--accent);color:#00232a;border:none;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer;box-shadow:var(--shadow)}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(34,211,238,.5)}
+    .kicker{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+    .legend{display:grid;gap:6px}
+    .legend div{display:flex;justify-content:space-between}
+    .mini{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="kicker">Trauma Tools</div>
+        <div class="title">RTS 계산기 (GCS 총점/구성요소 지원)</div>
+        <div class="subtitle">GCS(총점 또는 E+V+M), SBP, RR 입력 → 가중 RTS & 단순 RTS 자동 계산</div>
+      </div>
+      <div class="pill">모바일 최적화</div>
+    </header>
+
+    <section class="card">
+      <div class="grid">
+        <div>
+          <label>GCS 입력 방식</label>
+          <div class="field" role="radiogroup" aria-label="GCS 입력 방식">
+            <label class="pill"><input type="radio" name="gcsMode" id="gcsModeTotal" checked> 총점 직접 입력</label>
+            <label class="pill"><input type="radio" name="gcsMode" id="gcsModeEvm"> E+V+M 구성요소</label>
+          </div>
+          <div id="gcsTotalWrap" style="margin-top:8px">
+            <label for="gcsTotal" class="sr-only">GCS 총점</label>
+            <div class="field">
+              <input id="gcsTotal" type="number" inputmode="numeric" min="3" max="15" step="1" placeholder="예: 14" aria-describedby="gcs-total-hint" />
+            </div>
+            <div id="gcs-total-hint" class="hint">총 GCS 3–15를 직접 입력합니다. (13–15→코드 4, 9–12→3, 6–8→2, 4–5→1, 3→0)</div>
+          </div>
+          <div id="gcsEvmWrap" style="display:none;margin-top:8px">
+            <div class="grid">
+              <div>
+                <label for="gcsE">E (눈 뜸, 1–4)</label>
+                <div class="field"><input id="gcsE" type="number" inputmode="numeric" min="1" max="4" step="1" placeholder="예: 4"></div>
+                <div class="hint">4: 자발, 3: 말소리에, 2: 통증에, 1: 없음</div>
+              </div>
+              <div>
+                <label for="gcsV">V (언어, 1–5)</label>
+                <div class="field"><input id="gcsV" type="number" inputmode="numeric" min="1" max="5" step="1" placeholder="예: 5"></div>
+                <div class="hint">5: 지남력, 4: 혼돈, 3: 부적절, 2: 이해불가, 1: 없음</div>
+              </div>
+              <div>
+                <label for="gcsM">M (운동, 1–6)</label>
+                <div class="field"><input id="gcsM" type="number" inputmode="numeric" min="1" max="6" step="1" placeholder="예: 6"></div>
+                <div class="hint">6: 명령수행, 5: 통증국소화, 4: 철회, 3: 비정상굴곡, 2: 신전, 1: 없음</div>
+              </div>
+            </div>
+            <div class="hint" style="margin-top:6px">자동 합계: <b id="gcsSumOut">—</b> (최소 3, 최대 15)</div>
+          </div>
+        </div>
+        <div>
+          <label for="sbp">수축기 혈압 SBP (mmHg)</label>
+          <div class="field">
+            <input id="sbp" type="number" inputmode="numeric" min="0" max="300" step="1" placeholder="예: 110" aria-describedby="sbp-hint" />
+          </div>
+          <div id="sbp-hint" class="hint">≥89→코드 4, 76–89→3, 50–75→2, 1–49→1, 0→0</div>
+        </div>
+        <div>
+          <label for="rr">호흡수 RR (/분)</label>
+          <div class="field">
+            <input id="rr" type="number" inputmode="numeric" min="0" max="80" step="1" placeholder="예: 18" aria-describedby="rr-hint" />
+          </div>
+          <div id="rr-hint" class="hint">10–29→코드 4, >29→3, 6–9→2, 1–5→1, 0→0</div>
+        </div>
+      </div>
+      <div class="footer">
+        <button id="calc">계산하기</button>
+        <button id="reset" class="ghost" aria-label="입력 초기화">초기화</button>
+      </div>
+    </section>
+
+    <section class="card" aria-live="polite" aria-atomic="true">
+      <div class="result">
+        <div class="result-row">
+          <strong>가중 RTS</strong>
+          <div class="row">
+            <span id="weighted" class="badge ok">0.0000</span>
+            <span class="mini">(최대 7.8408)</span>
+          </div>
+        </div>
+        <div class="result-row">
+          <strong>단순 RTS (코드 합)</strong>
+          <div class="row">
+            <span id="simple" class="badge ok">0 / 12</span>
+          </div>
+        </div>
+        <div class="result-row">
+          <strong>코드 값</strong>
+          <div class="row mini" id="codes">GCS: 0 · SBP: 0 · RR: 0</div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:10px">
+        * 가중 공식: <code>0.9368×GCS코드 + 0.7326×SBP코드 + 0.2908×RR코드</code><br/>
+        * 임상 해석 예: RTS가 낮을수록 중증. <span class="pill">≤4 중증 위험↑</span>, <span class="pill">>6 생존 가능성↑</span> (맥락 의존)
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="legend">
+        <div><b>GCS</b><span class="mini">13–15→4 | 9–12→3 | 6–8→2 | 4–5→1 | 3→0</span></div>
+        <div><b>SBP</b><span class="mini">≥89→4 | 76–89→3 | 50–75→2 | 1–49→1 | 0→0</span></div>
+        <div><b>RR</b><span class="mini">10–29→4 | >29→3 | 6–9→2 | 1–5→1 | 0→0</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="kicker">주의</div>
+      <div class="note">본 도구는 교육 및 참고용입니다. 최종 임상 판단은 환자 상태, 기도·호흡·순환(및 XABCD 프로토콜) 등 종합적 평가와 의료지도의 지침을 따르십시오.</div>
+    </section>
+
+  </div>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+
+    const gcsModeTotal = $('#gcsModeTotal');
+    const gcsModeEvm   = $('#gcsModeEvm');
+    const gcsTotalWrap = $('#gcsTotalWrap');
+    const gcsEvmWrap   = $('#gcsEvmWrap');
+    const gcsTotalEl   = $('#gcsTotal');
+    const gcsEEl       = $('#gcsE');
+    const gcsVEl       = $('#gcsV');
+    const gcsMEl       = $('#gcsM');
+    const gcsSumOut    = $('#gcsSumOut');
+
+    const sbpEl = $('#sbp');
+    const rrEl  = $('#rr');
+    const weightedEl = $('#weighted');
+    const simpleEl = $('#simple');
+    const codesEl = $('#codes');
+
+    function clamp(n, min, max){ return Math.min(max, Math.max(min, n)); }
+
+    function codeGCS(total){
+      const v = Number(total);
+      if(isNaN(v)) return 0;
+      if(v>=13 && v<=15) return 4;
+      if(v>=9 && v<=12)  return 3;
+      if(v>=6 && v<=8)   return 2;
+      if(v>=4 && v<=5)   return 1;
+      if(v===3)          return 0;
+      return 0;
+    }
+    function codeSBP(v){
+      if(isNaN(v)) return 0;
+      if(v>=89) return 4;
+      if(v>=76) return 3;
+      if(v>=50) return 2;
+      if(v>=1)  return 1;
+      if(v===0) return 0;
+      return 0;
+    }
+    function codeRR(v){
+      if(isNaN(v)) return 0;
+      if(v>=10 && v<=29) return 4;
+      if(v>29) return 3;
+      if(v>=6 && v<=9) return 2;
+      if(v>=1 && v<=5) return 1;
+      if(v===0) return 0;
+      return 0;
+    }
+
+    function clsFor(value){
+      if(value <= 4) return 'badge crit';
+      if(value <= 6) return 'badge warn';
+      return 'badge ok';
+    }
+
+    function currentGcsTotal(){
+      if(gcsModeEvm.checked){
+        const e = clamp(Math.round(Number(gcsEEl.value)||0), 1, 4);
+        const v = clamp(Math.round(Number(gcsVEl.value)||0), 1, 5);
+        const m = clamp(Math.round(Number(gcsMEl.value)||0), 1, 6);
+        const sum = (e && v && m) ? (e+v+m) : NaN;
+        gcsSumOut.textContent = isNaN(sum) ? '—' : String(sum);
+        return sum;
+      }
+      const t = clamp(Math.round(Number(gcsTotalEl.value)||0), 3, 15);
+      return gcsTotalEl.value ? t : NaN;
+    }
+
+    function calc(){
+      const gTotal = currentGcsTotal();
+      const s = Number(sbpEl.value);
+      const r = Number(rrEl.value);
+
+      const cg = codeGCS(gTotal);
+      const cs = codeSBP(s);
+      const cr = codeRR(r);
+
+      const weighted = 0.9368*cg + 0.7326*cs + 0.2908*cr;
+      const simple = cg + cs + cr;
+
+      weightedEl.textContent = weighted.toFixed(4);
+      weightedEl.className = clsFor(weighted);
+      simpleEl.textContent = `${simple} / 12`;
+      simpleEl.className = clsFor(weighted);
+      codesEl.textContent = `GCS: ${cg} · SBP: ${cs} · RR: ${cr}`;
+
+      const mode = gcsModeEvm.checked ? 'evm' : 'total';
+      const params = new URLSearchParams({
+        gm: mode,
+        gt: (mode==='total' && gcsTotalEl.value)? gcsTotalEl.value : '',
+        ge: (mode==='evm'   && gcsEEl.value)? gcsEEl.value : '',
+        gv: (mode==='evm'   && gcsVEl.value)? gcsVEl.value : '',
+        gmz: (mode==='evm'  && gcsMEl.value)? gcsMEl.value : '',
+        s: isFinite(s)? s : '',
+        r: isFinite(r)? r : ''
+      });
+      history.replaceState(null, '', location.pathname + '#' + params.toString());
+    }
+
+    function resetForm(){
+      gcsTotalEl.value = '';
+      gcsEEl.value = '';
+      gcsVEl.value = '';
+      gcsMEl.value = '';
+      sbpEl.value = '';
+      rrEl.value = '';
+      calc();
+    }
+
+    function switchMode(){
+      const useEvm = gcsModeEvm.checked;
+      gcsEvmWrap.style.display   = useEvm ? '' : 'none';
+      gcsTotalWrap.style.display = useEvm ? 'none' : '';
+      calc();
+    }
+
+    function hydrateFromHash(){
+      if(location.hash && location.hash.length>1){
+        const q = new URLSearchParams(location.hash.slice(1));
+        const gm = q.get('gm');
+        if(gm==='evm'){
+          gcsModeEvm.checked = true; gcsModeTotal.checked = false; switchMode();
+          if(q.get('ge')) gcsEEl.value = q.get('ge');
+          if(q.get('gv')) gcsVEl.value = q.get('gv');
+          if(q.get('gmz')) gcsMEl.value = q.get('gmz');
+        } else {
+          gcsModeTotal.checked = true; gcsModeEvm.checked = false; switchMode();
+          if(q.get('gt')) gcsTotalEl.value = q.get('gt');
+        }
+        if(q.get('s')) sbpEl.value = q.get('s');
+        if(q.get('r')) rrEl.value = q.get('r');
+      }
+      calc();
+    }
+
+    $('#calc').addEventListener('click', calc);
+    $('#reset').addEventListener('click', resetForm);
+    gcsModeTotal.addEventListener('change', switchMode);
+    gcsModeEvm.addEventListener('change', switchMode);
+
+    [gcsTotalEl, gcsEEl, gcsVEl, gcsMEl, sbpEl, rrEl].forEach(el=>{
+      el.addEventListener('input', calc);
+      el.addEventListener('blur', ()=>{
+        if(el===gcsTotalEl && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 3, 15); }
+        if(el===gcsEEl && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 1, 4); }
+        if(el===gcsVEl && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 1, 5); }
+        if(el===gcsMEl && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 1, 6); }
+        if(el===sbpEl && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 0, 300); }
+        if(el===rrEl  && el.value){ el.value = clamp(Math.round(Number(el.value)||0), 0, 80); }
+        calc();
+      });
+    });
+
+    hydrateFromHash();
+  </script>
+</body>
+</html>
